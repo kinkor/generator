@@ -1,0 +1,30 @@
+#!/usr/bin/env php
+<?php
+if(version_compare('5.5.0', PHP_VERSION, '>')) {
+	fwrite(
+		STDERR,
+		sprintf(
+			'This version of kinkor/generator is supported on > 5.5.0.' . PHP_EOL .
+			'You are using PHP %s%s.' . PHP_EOL,
+			PHP_VERSION,
+			defined('PHP_BINARY') ? ' (' . PHP_BINARY . ')' : ''
+		)
+	);
+	die(1);
+}
+if(!ini_get('date.timezone')) {
+	ini_set('date.timezone', 'Asia/Shanghai');
+}
+foreach(array(
+	        __DIR__ . '/../../../autoload.php',
+	        __DIR__ . '/../../autoload.php',
+	        __DIR__ . '/../autoload.php',
+	        __DIR__ . '/../vendor/autoload.php',
+        ) as $file) {
+	if(file_exists($file)) {
+	    echo $file;
+		require_once $file;
+		break;
+	}
+}
+unset($file);

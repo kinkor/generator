@@ -41,7 +41,8 @@ class ClassParser {
 	/**
 	 * ClassParser constructor.
 	 *
-	 * @param $class
+	 * @param      $class
+	 * @param bool $forceNamespace
 	 */
 	public function __construct($class, $forceNamespace = FALSE) {
 		$this->ref = new \ReflectionClass($class);
@@ -113,13 +114,13 @@ class ClassParser {
 					$fullName = '\\' . implode('\\', $name);
 					if(strpos($fullName, $this->namespaceInfo['name']) !== FALSE) {
 						$tmpName = array_pop($name);
-						$this->classInfo['implements'][$key] = ($tmpName == $this->classInfo['name'] ? '' : $tmpName);
+						$this->classInfo['implements'][ $key ] = ($tmpName == $this->classInfo['name'] ? '' : $tmpName);
 					} else {
-						$this->classInfo['implements'][$key] = $fullName;
+						$this->classInfo['implements'][ $key ] = $fullName;
 					}
 				}
 				foreach($this->methodInfo as &$item) {
-					foreach($item['args'] as &$arg) {
+					foreach($item['parameters']->args as &$arg) {
 						if($arg['modify']) {
 							$name = $this->cnToNcn($arg['modify']);
 							$arg['modify'] = '\\' . implode('\\', $name);
@@ -185,29 +186,12 @@ class ClassParser {
 			$methods = $this->ref->getMethods();
 			foreach($methods as $method) {
 				$modifies = \Reflection::getModifierNames($method->getModifiers());
-				$params = $method->getParameters();
-				$args = [];
-				foreach($params as $param) {
-					$default = $param->isDefaultValueAvailable() ? ($param->isDefaultValueConstant() ?
-						$param->getDefaultValueConstantName() : $param->getDefaultValue()) : '';
-					$isOptional = $param->isOptional();
-					$isReference = $param->isPassedByReference();
-					$class = $param->getClass();
-					$item = [
-						'name'        => '$' . $param->getName(),
-						'position'    => $param->getPosition(),
-						'default'     => $default,
-						'is_optional' => $isOptional,
-						'modify'      => !$class ? '' : ($this->namespaceInfo['name'] ? '\\' . $class->getName() : $class->getShortName()),
-					];
-					!$isReference ?: $item['name'] = '&' . $item['name'];
-					$args[] = $item;
-				}
+				$parameters = new ParameterParser($method->getParameters(), boolval($this->namespaceInfo['name']));
 				$item = [
-					'name'   => $method->getName(),
-					'modify' => implode(' ', $modifies),
-					'doc'    => $method->getDocComment() ?: '',
-					'args'   => $args,
+					'name'       => $method->getName(),
+					'modify'     => implode(' ', $modifies),
+					'doc'        => $method->getDocComment() ?: '',
+					'parameters' => $parameters,
 				];
 				$this->methodInfo[] = $item;
 			}
@@ -236,12 +220,7 @@ class ClassParser {
 		}
 		foreach($this->methodInfo as $item) {
 			!$item['doc'] ?: $str[] = $item['doc'];
-			$argStr = [];
-			foreach($item['args'] as $arg) {
-				$argStr[] = ($arg['modify'] ? $arg['modify'] . ' ' : '') . $arg['name'] . ($arg['default'] ? '=' . $arg['default'] : '');
-			}
-			$argStr = implode(', ', $argStr);
-			$argStr = '(' . $argStr . ')';
+			$argStr = '(' . $item['parameters'] . ')';
 			$str[] = '    ' . ($item['modify'] ? $item['modify'] . ' ' : '') . 'function ' . $item['name'] . $argStr . ' { }' . PHP_EOL;
 		}
 		$str[] = '}';

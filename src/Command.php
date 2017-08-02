@@ -2,6 +2,7 @@
 namespace Kinkor\Generator;
 
 use Kinkor\Generator\Parser\ClassParser;
+use Kinkor\Generator\Parser\ExtensionParser;
 
 class Command {
 	
@@ -23,22 +24,17 @@ class Command {
 				throw new \Exception('Output path not exists.');
 			}
 			if(isset($params['extension'])) {
-				$command->parserExtension($params['extension'], isset($params['force-namespace']) ? TRUE : FALSE);
+				$parser = $command->parserExtension($params['extension'],
+					isset($params['force-namespace']) ? TRUE : FALSE);
+				foreach($parser->classes as $class) {
+					$command->outputClass($output, $class);
+				}
+				$command->outputConstant($output, $parser->constants, $params['extension'] . '_constant.php');
+				$command->outputFunction($output, $parser->functions, $params['extension'] . '_function.php');
 			}
 			if(isset($params['class'])) {
 				$parser = $command->parserClass($params['class'], isset($params['force-namespace']) ? TRUE : FALSE);
-				$dirs = explode('\\', $parser->namespaceInfo['name']);
-				foreach($dirs as $dir) {
-					$output .= '/' . $dir;
-					if(!file_exists($output)) {
-						mkdir($output);
-					}
-				}
-				$filename = $parser->classInfo['name'] . '.php';
-				if(file_exists($output . '/' . $filename)) {
-					@unlink($output . '/' . $filename);
-				}
-				file_put_contents($output . '/' . $filename, '<?php' . PHP_EOL . $parser);
+				$command->outputClass($output, $parser);
 			}
 		} catch(\Exception $e) {
 			echo 'Exception Message: ' . $e->getMessage() . PHP_EOL;
@@ -69,7 +65,7 @@ class Command {
 	public function help($str = '') {
 		switch($str) {
 			default:
-				print <<<EOF
+				echo <<<EOF
 Usage: generator options
   
 Options:
@@ -84,6 +80,13 @@ EOF;
 		exit;
 	}
 	
+	/**
+	 * @param      $class
+	 * @param bool $forceNamespace
+	 *
+	 * @return ClassParser
+	 * @throws \Exception
+	 */
 	public function parserClass($class, $forceNamespace = FALSE) {
 		if(!class_exists($class)) {
 			throw new \Exception('Class not exists.');
@@ -93,19 +96,68 @@ EOF;
 		return $parser;
 	}
 	
+	/**
+	 * @param      $extensionName
+	 * @param bool $forceNamespace
+	 *
+	 * @return ExtensionParser
+	 * @throws \Exception
+	 */
 	public function parserExtension($extensionName, $forceNamespace = FALSE) {
 		if(!extension_loaded($extensionName)) {
 			throw new \Exception($extensionName . ' extension not load.');
 		}
-		$ref = new \ReflectionExtension($extensionName);
-		var_dump($ref->getClasses());
-		var_dump($ref->getClassNames());
-		var_dump($ref->getConstants());
-		var_dump($ref->getDependencies());
-		var_dump($ref->getFunctions());
-		var_dump($ref->getINIEntries());
-		var_dump($ref->getName());
-		var_dump($ref->getVersion());
-		var_dump($ref->info());
+		$parser = new ExtensionParser($extensionName, $forceNamespace);
+		
+		return $parser;
+	}
+	
+	public function outputClass($output, ClassParser $parser) {
+		$dirs = explode('\\', $parser->namespaceInfo['name']);
+		foreach($dirs as $dir) {
+			$output .= '/' . $dir;
+			if(!file_exists($output)) {
+				mkdir($output);
+			}
+		}
+		$filename = $parser->classInfo['name'] . '.php';
+		if(file_exists($output . '/' . $filename)) {
+			@unlink($output . '/' . $filename);
+		}
+		file_put_contents($output . '/' . $filename, '<?php' . PHP_EOL . $parser);
+	}
+	
+	public function outputConstant($output, $constants, $filename) {
+		if(!file_exists($output)) {
+			mkdir($output);
+		}
+		if(file_exists($output . '/' . $filename)) {
+			@unlink($output . '/' . $filename);
+		}
+		$content = [];
+		foreach($constants as $name => $value) {
+			if(is_numeric($value)) {
+				$content[] = sprintf('define("%s", %s);', $name, $value);
+			} else {
+				$content[] = sprintf('define("%s", "%s");', $name, $value);
+			}
+		}
+		$content = implode(PHP_EOL, $content);
+		file_put_contents($output . '/' . $filename, '<?php' . PHP_EOL . $content);
+	}
+	
+	public function outputFunction($output, $functions, $filename) {
+		if(!file_exists($output)) {
+			mkdir($output);
+		}
+		if(file_exists($output . '/' . $filename)) {
+			@unlink($output . '/' . $filename);
+		}
+		$content = [];
+		foreach($functions as $item) {
+			$content[] = sprintf('function %s (%s) {}', $item['name'], $item['parameters']);
+		}
+		$content = implode(PHP_EOL, $content);
+		file_put_contents($output . '/' . $filename, '<?php' . PHP_EOL . $content);
 	}
 }

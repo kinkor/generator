@@ -38,7 +38,7 @@ class ParameterParser {
 		foreach($this->params as $parameter) {
 			if($parameter instanceof \ReflectionParameter) {
 				$default = $parameter->isDefaultValueAvailable() ? ($parameter->isDefaultValueConstant() ?
-					$parameter->getDefaultValueConstantName() : $parameter->getDefaultValue()) : '';
+					$parameter->getDefaultValueConstantName() : $parameter->getDefaultValue()) : NULL;
 				$isOptional = $parameter->isOptional();
 				$isReference = $parameter->isPassedByReference();
 				$isArray = $parameter->isArray();
@@ -51,7 +51,6 @@ class ParameterParser {
 					'is_optional' => $isOptional,
 					'modify'      => !$class ? '' : ($this->useNamespace ? '\\' . $class->getName() : $class->getShortName()),
 				];
-				var_dump($item);
 				!$isReference ?: $item['name'] = '&' . $item['name'];
 				$this->args[] = $item;
 			}
